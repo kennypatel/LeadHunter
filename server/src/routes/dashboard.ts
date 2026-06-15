@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, scopedCompanyId } from '../middleware/auth';
-import { asyncHandler } from '../middleware/error';
+import { asyncHandler, HttpError } from '../middleware/error';
 import { computeRoi } from '../utils/roi';
 import { runBulkRecovery } from '../services/recovery';
 import { z } from 'zod';
@@ -10,6 +10,19 @@ const router = Router();
 router.use(authenticate);
 
 const AVG_JOB_VALUE_FALLBACK = 9000; // typical NJ roofing job
+
+// Resolve which company a read targets. Admins get a global (null) rollup when
+// they don't name a company; non-admins are pinned to theirs and may never see
+// cross-tenant aggregates.
+function resolveTarget(req: import('express').Request): string | null {
+  const companyId = scopedCompanyId(req, (req.query.companyId as string) || (req.body?.companyId as string));
+  if (req.user!.role === 'ADMIN') {
+    const requested = (req.query.companyId as string) || (req.body?.companyId as string);
+    return requested ? companyId : null;
+  }
+  if (!companyId) throw new HttpError(400, 'No company in scope');
+  return companyId;
+}
 
 async function buildStats(companyId: string | null) {
   const where = companyId ? { companyId } : {};
@@ -25,7 +38,10 @@ async function buildStats(companyId: string | null) {
       prisma.lead.aggregate({ where: { ...where, status: 'BOOKED' }, _avg: { estimatedValue: true } }),
     ]);
 
-  const avgJobValue = Math.round(valueAgg._avg.estimatedValue || AVG_JOB_VALUE_FALLBACK);
+  // Only fall back when there are no booked leads at all (avg is null).
+  // A genuine $0 average must stay $0 so we don't fabricate recovered revenue.
+  const avg = valueAgg._avg.estimatedValue;
+  const avgJobValue = avg == null ? AVG_JOB_VALUE_FALLBACK : Math.round(avg);
   const roi = computeRoi({
     leadsTotal,
     leadsContacted: contacted,
@@ -58,8 +74,7 @@ async function buildStats(companyId: string | null) {
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const companyId = scopedCompanyId(req, req.query.companyId as string);
-    const stats = await buildStats(req.user!.role === 'ADMIN' && !req.query.companyId ? null : companyId);
+    const stats = await buildStats(resolveTarget(req));
     res.json({ stats });
   })
 );
@@ -87,7 +102,7 @@ router.get(
 router.get(
   '/weekly-report',
   asyncHandler(async (req, res) => {
-    const companyId = scopedCompanyId(req, req.query.companyId as string);
+    const companyId = resolveTarget(req);
     const stats = await buildStats(companyId);
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const where = companyId ? { companyId } : {};
@@ -125,7 +140,7 @@ router.post(
 router.get(
   '/export/leads.csv',
   asyncHandler(async (req, res) => {
-    const companyId = scopedCompanyId(req, req.query.companyId as string);
+    const companyId = resolveTarget(req);
     const leads = await prisma.lead.findMany({
       where: companyId ? { companyId } : {},
       orderBy: { createdAt: 'desc' },

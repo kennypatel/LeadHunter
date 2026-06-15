@@ -113,12 +113,12 @@ export default function LeadDetail() {
           <div className="card">
             <h2 className="font-semibold text-slate-900">Timeline</h2>
             <div className="mt-4 space-y-3">
-              {[...lead.messages.map((m) => ({ kind: 'msg' as const, at: m.createdAt, m })),
-                ...lead.notes.map((n) => ({ kind: 'note' as const, at: n.createdAt, n })),
+              {[...(lead.messages ?? []).map((m) => ({ kind: 'msg' as const, id: m.id, at: m.createdAt, m })),
+                ...(lead.notes ?? []).map((n) => ({ kind: 'note' as const, id: n.id, at: n.createdAt, n })),
               ]
                 .sort((a, b) => +new Date(b.at) - +new Date(a.at))
-                .map((item, i) => (
-                  <div key={i} className="border-l-2 border-slate-100 pl-3 text-sm">
+                .map((item) => (
+                  <div key={`${item.kind}-${item.id}`} className="border-l-2 border-slate-100 pl-3 text-sm">
                     <div className="text-xs text-slate-400">{new Date(item.at).toLocaleString()}</div>
                     {item.kind === 'msg' ? (
                       <div>
@@ -131,7 +131,7 @@ export default function LeadDetail() {
                     )}
                   </div>
                 ))}
-              {lead.messages.length === 0 && lead.notes.length === 0 && (
+              {(lead.messages ?? []).length === 0 && (lead.notes ?? []).length === 0 && (
                 <p className="text-sm text-slate-400">No activity yet. Draft a follow-up to get started.</p>
               )}
             </div>

@@ -41,6 +41,8 @@ router.get(
     const companyId = scopedCompanyId(req, req.query.companyId as string);
     const where: Prisma.MessageWhereInput = { status: 'PENDING_APPROVAL' };
     if (companyId) where.companyId = companyId;
+    // A non-admin with no company in scope must never see a global queue.
+    else if (req.user!.role !== 'ADMIN') return res.json({ messages: [] });
     const messages = await prisma.message.findMany({
       where,
       orderBy: { createdAt: 'asc' },
@@ -73,15 +75,15 @@ router.post(
   '/:id/approve',
   asyncHandler(async (req, res) => {
     const { scheduledFor, sendNow } = approveSchema.parse(req.body);
-    await approveMessage(req.params.id, req.user!.id, scheduledFor ? new Date(scheduledFor) : undefined);
-    if (sendNow) {
-      try {
+    try {
+      await approveMessage(req.params.id, req.user!.id, scheduledFor ? new Date(scheduledFor) : undefined);
+      if (sendNow) {
         const sent = await sendMessage(req.params.id, req.user!.id);
         return res.json({ message: sent });
-      } catch (err) {
-        if (err instanceof SendBlockedError) throw new HttpError(422, err.message);
-        throw err;
       }
+    } catch (err) {
+      if (err instanceof SendBlockedError) throw new HttpError(422, err.message);
+      throw err;
     }
     const message = await prisma.message.findUnique({ where: { id: req.params.id } });
     res.json({ message });

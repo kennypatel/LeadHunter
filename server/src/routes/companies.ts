@@ -9,6 +9,13 @@ import { BUILT_IN_TEMPLATES } from '../utils/templates';
 const router = Router();
 router.use(authenticate);
 
+// Non-admins may only act on their own company. Throws 403 otherwise.
+function assertCompanyScope(req: import('express').Request, companyId: string): void {
+  if (req.user!.role !== 'ADMIN' && req.user!.companyId !== companyId) {
+    throw new HttpError(403, 'Not permitted');
+  }
+}
+
 // Admin: list all companies. Client: their own.
 router.get(
   '/',
@@ -84,6 +91,7 @@ router.patch(
 router.post(
   '/:id/owners',
   asyncHandler(async (req, res) => {
+    assertCompanyScope(req, req.params.id);
     const body = z
       .object({ name: z.string().min(1), role: z.string().optional(), phone: z.string().optional(), email: z.string().optional() })
       .parse(req.body);
@@ -96,6 +104,7 @@ router.post(
 router.get(
   '/:id/onboarding',
   asyncHandler(async (req, res) => {
+    assertCompanyScope(req, req.params.id);
     const onboarding = await prisma.onboarding.findUnique({ where: { companyId: req.params.id } });
     res.json({ onboarding });
   })
@@ -104,6 +113,7 @@ router.get(
 router.patch(
   '/:id/onboarding',
   asyncHandler(async (req, res) => {
+    assertCompanyScope(req, req.params.id);
     const body = z.object({ step: z.number().int().min(1).max(7).optional(), completed: z.boolean().optional() }).parse(req.body);
     const onboarding = await prisma.onboarding.upsert({
       where: { companyId: req.params.id },
@@ -118,6 +128,7 @@ router.patch(
 router.get(
   '/:id/templates',
   asyncHandler(async (req, res) => {
+    assertCompanyScope(req, req.params.id);
     const templates = await prisma.template.findMany({ where: { companyId: req.params.id } });
     res.json({ templates });
   })
@@ -126,6 +137,7 @@ router.get(
 router.post(
   '/:id/templates',
   asyncHandler(async (req, res) => {
+    assertCompanyScope(req, req.params.id);
     const body = z
       .object({
         name: z.string().min(1),

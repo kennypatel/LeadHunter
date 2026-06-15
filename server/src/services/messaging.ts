@@ -9,9 +9,13 @@ import { getEmailProvider } from './email';
 import { getSmsProvider } from './sms';
 
 export class SendBlockedError extends Error {
-  constructor(message: string) {
+  // Transient blocks (e.g. the weekly frequency cap) clear on their own, so the
+  // message should stay queued for a later retry rather than being rejected.
+  transient: boolean;
+  constructor(message: string, transient = false) {
     super(message);
     this.name = 'SendBlockedError';
+    this.transient = transient;
   }
 }
 
@@ -54,13 +58,22 @@ export async function assertSendAllowed(messageId: string): Promise<void> {
   });
   if (recentSends >= env.maxMessagesPerLeadPerWeek) {
     throw new SendBlockedError(
-      `Frequency limit reached (${recentSends}/${env.maxMessagesPerLeadPerWeek} this week)`
+      `Frequency limit reached (${recentSends}/${env.maxMessagesPerLeadPerWeek} this week)`,
+      true // transient: clears as older sends age out of the window
     );
   }
 }
 
+const APPROVABLE_FROM = ['DRAFT', 'PENDING_APPROVAL', 'REJECTED'] as const;
+
 /** Approve a draft. Does NOT send — it moves it into the APPROVED queue. */
 export async function approveMessage(messageId: string, approverId: string, scheduledFor?: Date) {
+  const current = await prisma.message.findUnique({ where: { id: messageId }, select: { status: true } });
+  if (!current) throw new SendBlockedError('Message not found');
+  // Guard against double-approval re-sending an already-sent message.
+  if (!APPROVABLE_FROM.includes(current.status as (typeof APPROVABLE_FROM)[number])) {
+    throw new SendBlockedError(`Only un-sent drafts can be approved (current: ${current.status})`);
+  }
   const message = await prisma.message.update({
     where: { id: messageId },
     data: {
@@ -104,20 +117,31 @@ export async function sendMessage(messageId: string, actorId?: string) {
   if (message.status !== 'APPROVED' && message.status !== 'FAILED') {
     throw new SendBlockedError(`Message must be APPROVED to send (current: ${message.status})`);
   }
+  // Cap manual + scheduled retries so a permanently-broken recipient can't be
+  // hammered (the cron path also filters on this, but manual /send bypassed it).
+  if (message.retryCount >= 3) {
+    throw new SendBlockedError(`Retry limit reached (${message.retryCount})`);
+  }
 
   await assertSendAllowed(messageId);
 
   await prisma.message.update({ where: { id: messageId }, data: { status: 'QUEUED' } });
 
-  let result;
-  if (message.type === 'EMAIL') {
-    result = await getEmailProvider().send({
-      to: message.lead.email!,
-      subject: message.subject ?? 'A quick follow-up',
-      body: message.content,
-    });
-  } else {
-    result = await getSmsProvider().send({ to: message.lead.phone!, body: message.content });
+  // Wrap the provider call: a thrown exception (vs a {ok:false} result) must
+  // not strand the message in QUEUED, where nothing would ever retry it.
+  let result: { ok: boolean; providerId?: string; error?: string };
+  try {
+    if (message.type === 'EMAIL') {
+      result = await getEmailProvider().send({
+        to: message.lead.email!,
+        subject: message.subject ?? 'A quick follow-up',
+        body: message.content,
+      });
+    } else {
+      result = await getSmsProvider().send({ to: message.lead.phone!, body: message.content });
+    }
+  } catch (err) {
+    result = { ok: false, error: String(err) };
   }
 
   if (result.ok) {
@@ -171,10 +195,15 @@ export async function processDueMessages(): Promise<{ sent: number; failed: numb
     } catch (err) {
       blocked++;
       if (err instanceof SendBlockedError) {
-        await prisma.message.update({
-          where: { id: m.id },
-          data: { status: 'REJECTED', rejectionReason: err.message },
-        });
+        if (err.transient) {
+          // e.g. weekly frequency cap — leave APPROVED so it retries later.
+          logger.info('send deferred (transient block)', { id: m.id, reason: err.message });
+        } else {
+          await prisma.message.update({
+            where: { id: m.id },
+            data: { status: 'REJECTED', rejectionReason: err.message },
+          });
+        }
       } else {
         logger.error('processDueMessages error', { id: m.id, err: String(err) });
       }

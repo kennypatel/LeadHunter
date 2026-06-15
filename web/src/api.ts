@@ -24,7 +24,17 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
 
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  // Guard against non-JSON bodies (proxy HTML error pages, gateway 502s) so the
+  // real HTTP status surfaces instead of an "Unexpected token <" parse error.
+  let data: unknown = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      throw new Error('Unexpected non-JSON response from server');
+    }
+  }
   if (!res.ok) {
     throw new Error((data as ApiError)?.error || `Request failed (${res.status})`);
   }

@@ -16,15 +16,20 @@ export default function Dashboard() {
   const [error, setError] = useState('');
 
   async function load() {
+    // Core stats drive the page; the weekly report is secondary and must not
+    // blank the dashboard if its (AI) generation fails.
     try {
-      const [{ stats }, { report }] = await Promise.all([
-        api.get<{ stats: DashboardStats }>('/dashboard'),
-        api.get<{ report: WeeklyReport }>('/dashboard/weekly-report'),
-      ]);
+      const { stats } = await api.get<{ stats: DashboardStats }>('/dashboard');
       setStats(stats);
-      setReport(report);
     } catch (e) {
       setError((e as Error).message);
+      return;
+    }
+    try {
+      const { report } = await api.get<{ report: WeeklyReport }>('/dashboard/weekly-report');
+      setReport(report);
+    } catch {
+      setReport(null);
     }
   }
 

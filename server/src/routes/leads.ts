@@ -22,6 +22,16 @@ function requireCompany(req: import('express').Request): string {
   return companyId;
 }
 
+// Verify the caller is allowed to act on a given lead. Admins may touch any
+// lead; everyone else is pinned to their own company. Throws 404/403.
+async function assertLeadScope(req: import('express').Request, leadId: string): Promise<void> {
+  const lead = await prisma.lead.findUnique({ where: { id: leadId }, select: { companyId: true } });
+  if (!lead) throw new HttpError(404, 'Lead not found');
+  if (req.user!.role !== 'ADMIN' && lead.companyId !== req.user!.companyId) {
+    throw new HttpError(403, 'Not permitted');
+  }
+}
+
 // List with search + filter.
 router.get(
   '/',
@@ -67,19 +77,18 @@ router.post(
     const companyId = requireCompany(req);
     const data = createSchema.parse(req.body);
 
-    // Dedupe by phone/email within company.
-    const phone = normalizePhone(data.phone);
-    const email = normalizeEmail(data.email || undefined);
-    if (phone || email) {
-      const existing = await prisma.lead.findFirst({
-        where: {
-          companyId,
-          OR: [phone ? { phone: { contains: phone } } : undefined, email ? { email } : undefined].filter(
-            Boolean
-          ) as Prisma.LeadWhereInput[],
-        },
+    // Dedupe by normalized phone/email within company. We compare using the
+    // same dedupeKey logic as CSV import so formatting differences
+    // ("(908) 555-1234" vs "908-555-1234") still collide.
+    const key = dedupeKey(data);
+    if (normalizePhone(data.phone) || normalizeEmail(data.email || undefined)) {
+      const existing = await prisma.lead.findMany({
+        where: { companyId },
+        select: { phone: true, email: true, name: true },
       });
-      if (existing) throw new HttpError(409, 'A lead with that phone/email already exists');
+      if (existing.some((e) => dedupeKey(e) === key)) {
+        throw new HttpError(409, 'A lead with that phone/email already exists');
+      }
     }
 
     const score = scoreLead({
@@ -141,8 +150,9 @@ const updateSchema = createSchema.partial().extend({
 router.patch(
   '/:id',
   asyncHandler(async (req, res) => {
+    await assertLeadScope(req, req.params.id);
     const data = updateSchema.parse(req.body);
-    const lead = await prisma.lead.update({
+    let lead = await prisma.lead.update({
       where: { id: req.params.id },
       data: {
         ...data,
@@ -152,6 +162,23 @@ router.patch(
     if (data.status) {
       await prisma.pipeline.updateMany({ where: { leadId: lead.id }, data: { stage: data.status } });
     }
+    // Keep the score in sync when fields that drive it change (status, value,
+    // consent/unsubscribe). Otherwise a CLOSED/unsubscribed lead stays "HOT".
+    const rescore = scoreLead({
+      source: lead.source,
+      status: lead.status,
+      estimatedValue: lead.estimatedValue,
+      createdAt: lead.createdAt,
+      lastContactedAt: lead.lastContactedAt,
+      unsubscribed: lead.unsubscribed,
+      notesText: lead.notesText,
+    });
+    if (rescore.score !== lead.score) {
+      lead = await prisma.lead.update({
+        where: { id: lead.id },
+        data: { score: rescore.score, scoreReason: rescore.reason },
+      });
+    }
     await audit({ actorId: req.user!.id, action: 'lead.updated', entity: 'Lead', entityId: lead.id, metadata: data });
     res.json({ lead });
   })
@@ -160,6 +187,7 @@ router.patch(
 router.delete(
   '/:id',
   asyncHandler(async (req, res) => {
+    await assertLeadScope(req, req.params.id);
     await prisma.lead.delete({ where: { id: req.params.id } });
     await audit({ actorId: req.user!.id, action: 'lead.deleted', entity: 'Lead', entityId: req.params.id });
     res.json({ ok: true });
@@ -231,6 +259,7 @@ router.post(
 router.post(
   '/:id/classify',
   asyncHandler(async (req, res) => {
+    await assertLeadScope(req, req.params.id);
     const lead = await classifyAndSave(req.params.id);
     res.json({ lead });
   })
@@ -244,6 +273,7 @@ const draftSchema = z.object({
 router.post(
   '/:id/draft',
   asyncHandler(async (req, res) => {
+    await assertLeadScope(req, req.params.id);
     const { type, workflow } = draftSchema.parse(req.body);
     const message = await generateDraft({ leadId: req.params.id, type, workflow, actorId: req.user!.id });
     res.status(201).json({ message });
@@ -254,6 +284,7 @@ router.post(
 router.get(
   '/:id/insights',
   asyncHandler(async (req, res) => {
+    await assertLeadScope(req, req.params.id);
     const lead = await prisma.lead.findUnique({
       where: { id: req.params.id },
       include: { messages: { orderBy: { createdAt: 'desc' }, take: 5, select: { content: true } } },
@@ -280,6 +311,7 @@ router.get(
 router.post(
   '/:id/notes',
   asyncHandler(async (req, res) => {
+    await assertLeadScope(req, req.params.id);
     const text = z.object({ text: z.string().min(1) }).parse(req.body).text;
     const note = await prisma.note.create({
       data: { leadId: req.params.id, text, createdById: req.user!.id },
@@ -291,6 +323,7 @@ router.post(
 router.post(
   '/:id/tasks',
   asyncHandler(async (req, res) => {
+    await assertLeadScope(req, req.params.id);
     const body = z
       .object({ title: z.string().min(1), description: z.string().optional(), dueDate: z.string().optional() })
       .parse(req.body);

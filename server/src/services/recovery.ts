@@ -142,8 +142,11 @@ export async function runBulkRecovery(params: {
       skipped++;
       continue;
     }
-    const hasChannel = params.type === 'EMAIL' ? !!lead.email : !!lead.phone;
-    if (!hasChannel) {
+    // Require both an address AND consent on the chosen channel, so we don't
+    // queue drafts the compliance gate will only reject at send time.
+    const channelReady =
+      params.type === 'EMAIL' ? !!lead.email && lead.consentEmail : !!lead.phone && lead.consentSms;
+    if (!channelReady) {
       skipped++;
       continue;
     }

@@ -30,8 +30,12 @@ export default function Approvals() {
     setError('');
     try {
       const content = edits[m.id];
-      if (content && content !== m.content) {
-        await api.patch(`/messages/${m.id}`, { content });
+      const subject = edits[`${m.id}__subject`];
+      const patch: Record<string, string> = {};
+      if (content !== undefined && content !== m.content) patch.content = content;
+      if (subject !== undefined && subject !== m.subject) patch.subject = subject;
+      if (Object.keys(patch).length) {
+        await api.patch(`/messages/${m.id}`, patch);
       }
       await api.post(`/messages/${m.id}/approve`, { sendNow });
       load();
