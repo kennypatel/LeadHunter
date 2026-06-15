@@ -35,11 +35,12 @@ export const env = {
     model: process.env.AI_MODEL ?? 'gpt-4o-mini',
   },
   email: {
-    provider: process.env.EMAIL_PROVIDER ?? 'console', // console | smtp
+    provider: process.env.EMAIL_PROVIDER ?? 'console', // console | smtp | sendgrid
     host: process.env.SMTP_HOST ?? '',
     port: parseInt(process.env.SMTP_PORT ?? '587', 10),
     user: process.env.SMTP_USER ?? '',
     pass: process.env.SMTP_PASS ?? '',
+    apiKey: process.env.SENDGRID_API_KEY ?? '', // for provider=sendgrid
     from: process.env.EMAIL_FROM ?? 'noreply@leakhunter.app',
   },
   sms: {
