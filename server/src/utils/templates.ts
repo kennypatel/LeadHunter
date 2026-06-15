@@ -14,18 +14,6 @@ export function renderTemplate(template: string, tokens: TemplateTokens): string
   });
 }
 
-/**
- * Like renderTemplate, but only substitutes tokens we have values for and
- * leaves the rest as literal {{placeholders}}. Used for sales drafts the
- * operator finishes filling in by hand.
- */
-export function fillTokensPartial(template: string, tokens: TemplateTokens): string {
-  return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, key: string) => {
-    const value = tokens[key];
-    return value === undefined || value === null || value === '' ? match : String(value);
-  });
-}
-
 export function firstName(fullName?: string | null): string {
   if (!fullName) return 'there';
   return fullName.trim().split(/\s+/)[0] || 'there';

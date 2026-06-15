@@ -3,7 +3,7 @@
 import { prisma } from '../lib/prisma';
 import { audit } from './audit';
 import { getAiProvider } from './ai';
-import { Workflow, firstName, fillTokensPartial } from '../utils/templates';
+import { Workflow, firstName, renderTemplate } from '../utils/templates';
 import { scoreLead } from '../utils/scoring';
 import { getSalesTemplate } from '../utils/salesTemplates';
 
@@ -61,22 +61,27 @@ export async function generateDraft(opts: GenerateDraftOptions) {
   let draft: { subject?: string; body: string; generatedBy: string };
 
   if (opts.style === 'sales') {
-    // Use the curated sales opener (email) / intro text (SMS). Fill the tokens
-    // we know and leave the rest as visible {{placeholders}} for the operator.
+    // Use the curated sales opener (email) / intro text (SMS). Every token gets
+    // a concrete fallback so the draft never contains an empty gap or a literal
+    // {{placeholder}} — the operator can still edit before sending.
     const tmpl = getSalesTemplate(opts.type);
     let senderName: string | undefined;
     if (opts.actorId) {
       const actor = await prisma.user.findUnique({ where: { id: opts.actorId }, select: { name: true } });
-      senderName = actor?.name;
+      senderName = actor?.name ?? undefined;
     }
+    const senderCompany = lead.company.name || 'our team';
     const tokens = {
       firstName: firstName(lead.name),
-      senderCompany: lead.company.name,
-      senderName,
+      companyName: lead.name || 'your company',
+      city: lead.company.serviceArea || 'your area',
+      senderName: senderName || senderCompany,
+      senderCompany,
+      calendarLink: "just reply and we'll find a time",
     };
     draft = {
-      subject: tmpl.subject ? fillTokensPartial(tmpl.subject, tokens) : undefined,
-      body: fillTokensPartial(tmpl.body, tokens),
+      subject: tmpl.subject ? renderTemplate(tmpl.subject, tokens) : undefined,
+      body: renderTemplate(tmpl.body, tokens),
       generatedBy: 'sales_template',
     };
   } else {
