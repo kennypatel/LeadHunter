@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: leakhunter
+      POSTGRES_PASSWORD: leakhunter
+      POSTGRES_DB: leakhunter
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U leakhunter']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://leakhunter:leakhunter@db:5432/leakhunter?schema=public
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
+      SMS_PROVIDER: ${SMS_PROVIDER:-console}
+    ports:
+      - '4000:4000'
+    depends_on:
+      db:
+        condition: service_healthy
+    # Run migrations then start the API.
+    command: sh -c "npm --workspace server run db:migrate && node server/dist/index.js"
+
+volumes:
+  pgdata:

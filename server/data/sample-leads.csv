@@ -1,0 +1,8 @@
+Full Name,Phone Number,Email,Source,Estimated Value,Notes
+Robert King,(908) 555-1100,robert.king@example.com,old_quote,11000,Wanted full roof replacement last fall
+Linda Gomez,973-555-1101,linda.gomez@example.com,missed_call,7500,Called twice no answer
+Derek Shaw,(201) 555-1102,derek.shaw@example.com,web_form,9500,Asked about gutter + roof
+Priya Nair,862-555-1103,priya.nair@example.com,csv_import,6000,Old lead from 2024
+Marcus Webb,(908) 555-1104,marcus.webb@example.com,referral,13500,Neighbor referral storm damage
+Robert King,908-555-1100,robert.king@example.com,old_quote,11000,DUPLICATE ROW for dedupe testing
+Sophia Tran,(973) 555-1105,sophia.tran@example.com,estimate,8000,Estimate sent never replied
