@@ -78,6 +78,18 @@ export default function Admin() {
     }
   }
 
+  async function deleteNoEmail() {
+    if (!confirm('Permanently DELETE every lead that has no email address? This cannot be undone.')) return;
+    setNotice('');
+    try {
+      const res = await api.post<{ deleted: number }>('/admin/delete-leads-without-email');
+      setNotice(`Deleted ${res.deleted} lead(s) with no email.`);
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   if (loading) return <AppLayout><Spinner /></AppLayout>;
 
   return (
@@ -88,6 +100,7 @@ export default function Admin() {
           <button className="btn-secondary" onClick={retry}>Retry due jobs</button>
           <a className="btn-secondary" href="/api/admin/export.json">Export JSON</a>
           <button className="btn-secondary text-red-600" onClick={clearPhones}>Clear all phone numbers</button>
+          <button className="btn-secondary text-red-600" onClick={deleteNoEmail}>Delete leads with no email</button>
         </div>
       </div>
       {error && <div className="mt-4"><ErrorNote message={error} /></div>}

@@ -63,6 +63,24 @@ router.post(
   })
 );
 
+// Bulk data action: permanently delete every lead that has no email address
+// (e.g. phone-only leads). Cascades to their notes, tasks, messages, pipeline.
+router.post(
+  '/delete-leads-without-email',
+  asyncHandler(async (req, res) => {
+    const result = await prisma.lead.deleteMany({
+      where: { OR: [{ email: null }, { email: '' }] },
+    });
+    await audit({
+      actorId: req.user!.id,
+      action: 'lead.deleted_without_email',
+      entity: 'Lead',
+      metadata: { count: result.count },
+    });
+    res.json({ deleted: result.count });
+  })
+);
+
 // Users CRUD (minimal).
 router.get(
   '/users',
