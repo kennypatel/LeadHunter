@@ -1,8 +1,8 @@
 // Polished sales outreach templates the operator uses to sign New Jersey
 // roofing companies as LeakHunter clients. Static, curated copy surfaced in the
-// app (Sales Templates page) with copy-to-clipboard. Tokens are filled in by the
-// operator before sending: {{firstName}}, {{companyName}}, {{city}},
-// {{senderName}}, {{senderCompany}}, {{calendarLink}}.
+// app (Sales Templates page) with copy-to-clipboard. Tokens are filled before
+// sending: {{firstName}} + {{companyName}} = the roofing prospect;
+// {{senderName}}, {{senderTitle}}, {{senderCompany}}, {{calendarLink}} = you.
 
 export interface SalesTemplate {
   id: string;
@@ -18,6 +18,7 @@ export const SALES_TOKENS = [
   '{{companyName}}',
   '{{city}}',
   '{{senderName}}',
+  '{{senderTitle}}',
   '{{senderCompany}}',
   '{{calendarLink}}',
 ];
@@ -29,17 +30,17 @@ export const SALES_TEMPLATES: SalesTemplate[] = [
     category: 'Cold email sequence',
     name: 'Email 1 — Opener',
     channel: 'EMAIL',
-    subject: 'missed calls at {{companyName}}?',
+    subject: 'the leads {{companyName}} already paid for',
     body: `Hi {{firstName}},
 
-Quick one — when a homeowner calls {{companyName}} and no one picks up, or an estimate goes quiet, that job usually doesn't come back. Most roofers I talk to around {{city}} have hundreds of those sitting in a spreadsheet or voicemail.
+Most roofing companies are sitting on a goldmine they've forgotten about: missed calls, old quotes, and estimates that quietly went cold. Those homeowners were ready to buy once — most just need a nudge.
 
-I set up a simple system that revives those leads — missed calls, old quotes, unanswered estimates — with personalized follow-ups you approve before anything sends. No new ad spend; it just recovers revenue you already paid to generate.
+I built a system that revives them for you. It imports your old leads, drafts a personalized text and email for each one, and routes everything to you for a quick approval before a single message goes out. No new ad spend, no cold lists — just revenue {{companyName}} already paid to create.
 
-Worth a 15-minute look? I'll run a free audit of your missed calls and old leads and show you what's recoverable.
+I'd like to run a free audit of your missed calls and old leads and show you, in real dollars, what's recoverable. Worth 15 minutes?
 
 {{senderName}}
-{{senderCompany}}
+{{senderTitle}}, {{senderCompany}}
 {{calendarLink}}`,
   },
   {
@@ -47,45 +48,48 @@ Worth a 15-minute look? I'll run a free audit of your missed calls and old leads
     category: 'Cold email sequence',
     name: 'Email 2 — Follow-up (3 days later)',
     channel: 'EMAIL',
-    subject: 're: missed calls at {{companyName}}',
+    subject: 're: the leads {{companyName}} already paid for',
     body: `Hi {{firstName}},
 
-Floating this back to the top. Even 2–3 recovered roofs a month — from leads you already have — is real money with zero extra ad spend.
+Floating this back to the top. Even recovering 2–3 extra roofs a month — from leads you already have — is a serious number, with zero added marketing cost.
 
-If it's worth a look, just reply "audit" and I'll take it from there.
+Want me to run the free audit? Just reply "audit" and I'll handle the rest.
 
 {{senderName}}`,
   },
   {
     id: 'email-3-proof',
     category: 'Cold email sequence',
-    name: 'Email 3 — Proof (5 days later)',
+    name: 'Email 3 — How it works (5 days later)',
     channel: 'EMAIL',
-    subject: 'turning old quotes into booked jobs',
+    subject: 'how roofers turn old quotes into booked jobs',
     body: `Hi {{firstName}},
 
-Here's how it works in practice: a roofer imports their old leads, the system drafts a personalized text/email for each one, and they approve them in batches — nothing sends without a human okay. Replies come back in, estimates get booked.
+Here's the playbook in plain English: we load your old leads, the system writes a personal follow-up for each, and you approve them in batches — nothing sends without your okay. Replies come in, estimates get booked, and you stop leaving money on the table.
 
-The leads are already yours. This just makes sure none of them quietly slip away.
+The best part: these are your leads. I'm just making sure none of them slip away.
 
-Open to a quick 15 minutes this week? {{calendarLink}}
+Got 15 minutes this week? {{calendarLink}}
 
-{{senderName}}`,
+{{senderName}}
+{{senderTitle}}, {{senderCompany}}`,
   },
   {
     id: 'email-4-breakup',
     category: 'Cold email sequence',
     name: 'Email 4 — Breakup (7 days later)',
     channel: 'EMAIL',
-    subject: 'should I close your file, {{firstName}}?',
+    subject: 'closing your file, {{firstName}}?',
     body: `Hi {{firstName}},
 
-I don't want to keep landing in your inbox. If reviving old leads isn't a priority for {{companyName}} right now, no problem — I'll close it out.
+I don't want to keep cluttering your inbox. If reviving old leads isn't a priority for {{companyName}} right now, no hard feelings — I'll close this out.
 
-If it is, just reply and I'll send over the free audit. Either way, I appreciate your time.
+But if there's any chance it is, just reply and I'll send over the free audit. It costs you nothing and usually pays for itself many times over.
+
+Either way, thanks for your time.
 
 {{senderName}}
-{{senderCompany}}`,
+{{senderTitle}}, {{senderCompany}}`,
   },
 
   // --- Other channels -----------------------------------------------------
@@ -94,21 +98,21 @@ If it is, just reply and I'll send over the free audit. Either way, I appreciate
     category: 'Text message',
     name: 'Intro text',
     channel: 'SMS',
-    body: `Hi {{firstName}}, {{senderName}} here — I help {{city}} roofers turn missed calls & old quotes into booked jobs (no new ad spend). Open to a quick free audit? Reply STOP to opt out.`,
+    body: `Hi {{firstName}}, it's {{senderName}} from {{senderCompany}}. I help {{city}} roofers turn missed calls & old quotes into booked jobs — no new ad spend. Open to a quick free audit? Reply STOP to opt out.`,
   },
   {
     id: 'voicemail',
     category: 'Voicemail',
     name: 'Voicemail script',
     channel: 'CALL',
-    body: `Hey {{firstName}}, it's {{senderName}} with {{senderCompany}}. I help roofers around {{city}} turn missed calls and old estimates into booked jobs — revenue you already paid to generate. I'll follow up with a quick email; if it's interesting, I'd love to run a free audit for {{companyName}}. Talk soon.`,
+    body: `Hi {{firstName}}, this is {{senderName}}, {{senderTitle}} at {{senderCompany}}. I help roofers around {{city}} turn missed calls and old estimates into booked jobs — revenue you already paid to generate. I'll follow up by email; if it's a fit, I'd love to run a free audit for {{companyName}}. Talk soon.`,
   },
   {
     id: 'linkedin-connect',
     category: 'LinkedIn',
     name: 'Connection request',
     channel: 'LINKEDIN',
-    body: `Hi {{firstName}} — I help NJ roofers recover revenue from missed calls and old quotes. Would love to connect and share a quick idea for {{companyName}}.`,
+    body: `Hi {{firstName}} — I help roofing companies recover revenue from missed calls and old quotes. Would love to connect and share a quick idea for {{companyName}}.`,
   },
 
   // --- Helpers ------------------------------------------------------------
@@ -117,11 +121,11 @@ If it is, just reply and I'll send over the free audit. Either way, I appreciate
     category: 'Subject line bank',
     name: 'Subject lines to A/B test',
     channel: 'NOTE',
-    body: `• missed calls at {{companyName}}?
-• {{firstName}}, leads you already paid for
-• quick question about {{companyName}}'s old quotes
-• recovering booked jobs for {{companyName}}
-• {{city}} roofers are leaving this on the table`,
+    body: `• the leads {{companyName}} already paid for
+• {{firstName}}, recovering booked jobs for {{companyName}}
+• missed calls at {{companyName}}?
+• {{city}} roofers are leaving this on the table
+• a quick idea for {{companyName}}'s old quotes`,
   },
   {
     id: 'pilot-offer',
@@ -131,14 +135,17 @@ If it is, just reply and I'll send over the free audit. Either way, I appreciate
     body: `Here's a simple way to start, {{firstName}}:
 
 PILOT — $500 one-time
-• Audit of your missed calls + old leads
+• Full audit of your missed calls + old leads
 • Import up to 500 leads
 • 2 recovery campaigns (you approve every message)
-• A clear report of what we recovered
+• A clear report of exactly what we recovered
 
-If it pays for itself (it usually does), we move to a monthly retainer to keep it running. No long-term contract.
+If it pays for itself — and it usually does — we move to a simple monthly retainer to keep it running. No long-term contract, cancel anytime.
 
-Want me to get the pilot set up? {{calendarLink}}`,
+Want me to set up the pilot? {{calendarLink}}
+
+{{senderName}}
+{{senderTitle}}, {{senderCompany}}`,
   },
 ];
 

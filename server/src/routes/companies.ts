@@ -42,6 +42,7 @@ const companySchema = z.object({
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   website: z.string().optional(),
+  calendarLink: z.string().optional(),
 });
 
 // Create a company and seed it with the built-in templates + onboarding.

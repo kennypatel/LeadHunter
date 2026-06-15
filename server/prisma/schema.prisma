@@ -56,6 +56,8 @@ model Company {
   phone       String?
   email       String?
   website     String?
+  // Booking/calendar link used in outreach (e.g. Calendly). Optional.
+  calendarLink String?
   // Per-client safety switch. When false, no outreach can be auto-sent;
   // everything goes through the human approval queue.
   autoSendEnabled Boolean @default(false)

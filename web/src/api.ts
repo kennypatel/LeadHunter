@@ -65,6 +65,10 @@ export interface Company {
   name: string;
   phone?: string | null;
   serviceArea?: string | null;
+  address?: string | null;
+  email?: string | null;
+  website?: string | null;
+  calendarLink?: string | null;
   autoSendEnabled?: boolean;
 }
 export type LeadStatus = 'NEW' | 'CONTACTED' | 'RESPONDING' | 'ESTIMATE' | 'BOOKED' | 'CLOSED';

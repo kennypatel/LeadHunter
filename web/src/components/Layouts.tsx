@@ -53,6 +53,7 @@ const NAV = [
   { to: '/app/leads', label: 'Leads' },
   { to: '/app/approvals', label: 'Approvals' },
   { to: '/app/onboarding', label: 'Onboarding' },
+  { to: '/app/settings', label: 'Settings' },
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
