@@ -79,16 +79,22 @@ router.get(
 router.post(
   '/unsubscribe',
   asyncHandler(async (req, res) => {
-    const { lead, channel } = z
-      .object({ lead: z.string(), channel: z.enum(['EMAIL', 'SMS']).optional() })
-      .parse(req.body);
+    // Accept the lead id from the body (form) OR the query string. Mailbox
+    // providers performing RFC 8058 one-click unsubscribe POST to the header
+    // URL (which carries ?lead=) with a non-JSON body, so we must not require it.
+    const lead = String((req.body?.lead as string) || (req.query.lead as string) || '');
+    const channel = (req.body?.channel as string) || undefined;
+    if (!lead) return res.status(400).json({ error: 'Missing lead token' });
     const exists = await prisma.lead.findUnique({ where: { id: lead } });
     if (exists) {
       await prisma.lead.update({
         where: { id: lead },
         data: { unsubscribed: true, consentEmail: false, consentSms: false, score: 'DEAD' },
       });
-      await prisma.consent.create({ data: { leadId: lead, channel: channel ?? 'EMAIL', granted: false, source: 'unsubscribe_form' } });
+      await prisma.consent.create({
+        data: { leadId: lead, channel: channel === 'SMS' ? 'SMS' : 'EMAIL', granted: false, source: 'unsubscribe_one_click' },
+      });
+      await audit({ action: 'lead.unsubscribed', entity: 'Lead', entityId: lead, metadata: { via: 'list_unsubscribe' } });
     }
     res.json({ ok: true });
   })
