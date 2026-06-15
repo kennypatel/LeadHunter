@@ -166,10 +166,13 @@ export async function sendMessage(messageId: string, actorId?: string) {
         address: message.company.address || env.businessAddress || null,
         unsubscribeUrl: unsubscribeUrl(env.publicUrl, message.leadId),
       });
+      // One-click unsubscribe endpoint (accepts POST) for the List-Unsubscribe header.
+      const oneClickUrl = `${env.publicUrl.replace(/\/+$/, '')}/api/public/unsubscribe?lead=${message.leadId}`;
       result = await getEmailProvider().send({
         to: message.lead.email!,
         subject: message.subject ?? 'A quick follow-up',
         body: appendEmailFooter(message.content, footer),
+        unsubscribeUrl: oneClickUrl,
       });
     } else {
       result = await getSmsProvider().send({ to: message.lead.phone!, body: message.content });

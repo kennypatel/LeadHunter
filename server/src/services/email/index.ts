@@ -8,6 +8,8 @@ export interface SendEmailParams {
   subject: string;
   body: string;
   from?: string;
+  // RFC 8058 one-click unsubscribe URL (Gmail/Yahoo bulk-sender requirement).
+  unsubscribeUrl?: string;
 }
 
 export interface SendResult {
@@ -50,6 +52,9 @@ class SmtpEmailProvider implements EmailProvider {
         to: params.to,
         subject: params.subject,
         text: params.body,
+        ...(params.unsubscribeUrl
+          ? { list: { unsubscribe: { url: params.unsubscribeUrl, comment: 'Unsubscribe' } } }
+          : {}),
       });
       return { ok: true, providerId: info.messageId };
     } catch (err) {
@@ -66,6 +71,14 @@ class SendGridEmailProvider implements EmailProvider {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
+      // One-click unsubscribe headers (RFC 8058) — required by Gmail/Yahoo for
+      // bulk senders and improves inbox placement.
+      const headers = params.unsubscribeUrl
+        ? {
+            'List-Unsubscribe': `<${params.unsubscribeUrl}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          }
+        : undefined;
       const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
         method: 'POST',
         headers: {
@@ -77,6 +90,7 @@ class SendGridEmailProvider implements EmailProvider {
           from: { email: params.from ?? env.email.from },
           subject: params.subject,
           content: [{ type: 'text/plain', value: params.body }],
+          ...(headers ? { headers } : {}),
         }),
         signal: controller.signal,
       });
