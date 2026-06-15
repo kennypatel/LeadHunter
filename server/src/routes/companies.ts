@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { authenticate, requireRole, scopedCompanyId } from '../middleware/auth';
+import { authenticate, requireRole, scopedCompanyId, signToken } from '../middleware/auth';
 import { asyncHandler, HttpError } from '../middleware/error';
+import { env } from '../config/env';
 import { audit } from '../services/audit';
 import { BUILT_IN_TEMPLATES } from '../utils/templates';
 
@@ -63,12 +64,23 @@ router.post(
       })),
     });
 
-    // Attach the creating client to this company if they have none.
-    if (req.user!.role === 'CLIENT' && !req.user!.companyId) {
+    // Attach the creating user to this company if they have none (applies to a
+    // solo operator/admin too). Issue a fresh token + cookie so the new
+    // companyId takes effect immediately without re-logging-in.
+    let token: string | undefined;
+    if (!req.user!.companyId) {
       await prisma.user.update({ where: { id: req.user!.id }, data: { companyId: company.id } });
+      const authUser = { id: req.user!.id, email: req.user!.email, role: req.user!.role, companyId: company.id };
+      token = signToken(authUser);
+      res.cookie(env.cookieName, token, {
+        httpOnly: true,
+        secure: env.isProd,
+        sameSite: 'lax',
+        maxAge: 1000 * 60 * 60 * 24 * 7,
+      });
     }
     await audit({ actorId: req.user!.id, action: 'company.created', entity: 'Company', entityId: company.id });
-    res.status(201).json({ company });
+    res.status(201).json({ company, token });
   })
 );
 

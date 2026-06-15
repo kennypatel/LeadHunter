@@ -4,8 +4,11 @@ import { AppLayout } from '../../components/Layouts';
 import { api, Lead } from '../../api';
 import { ScoreBadge, StatusBadge, money, Spinner, ErrorNote } from '../../components/ui';
 import AddLeadForm from './AddLeadForm';
+import CompanySetup from './CompanySetup';
+import { useAuth } from '../../auth';
 
 export default function Leads() {
+  const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [q, setQ] = useState('');
   const [scoreFilter, setScoreFilter] = useState('');
@@ -32,9 +35,10 @@ export default function Leads() {
   }
 
   useEffect(() => {
-    load();
+    if (user?.companyId) load();
+    else setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scoreFilter]);
+  }, [scoreFilter, user?.companyId]);
 
   async function importCsv(file: File) {
     setNotice('');
@@ -58,6 +62,16 @@ export default function Leads() {
     } catch (e) {
       setError((e as Error).message);
     }
+  }
+
+  if (!user?.companyId) {
+    return (
+      <AppLayout>
+        <h1 className="mb-2 text-2xl font-bold text-slate-900">Leads</h1>
+        <p className="mb-6 text-sm text-slate-500">First, set up the company you're managing.</p>
+        <CompanySetup />
+      </AppLayout>
+    );
   }
 
   return (
