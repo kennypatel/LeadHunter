@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { authenticate, requireRole } from '../middleware/auth';
 import { asyncHandler } from '../middleware/error';
 import { processDueMessages } from '../services/messaging';
+import { audit } from '../services/audit';
 
 const router = Router();
 router.use(authenticate, requireRole('ADMIN'));
@@ -41,6 +42,24 @@ router.post(
   asyncHandler(async (_req, res) => {
     const result = await processDueMessages();
     res.json(result);
+  })
+);
+
+// Bulk data action: permanently clear the stored phone number on every lead.
+router.post(
+  '/clear-phone-numbers',
+  asyncHandler(async (req, res) => {
+    const result = await prisma.lead.updateMany({
+      where: { phone: { not: null } },
+      data: { phone: null },
+    });
+    await audit({
+      actorId: req.user!.id,
+      action: 'lead.phones_cleared',
+      entity: 'Lead',
+      metadata: { count: result.count },
+    });
+    res.json({ cleared: result.count });
   })
 );
 
