@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AppLayout } from '../../components/Layouts';
 import { api, Lead, Message } from '../../api';
+import { useAuth } from '../../auth';
 import { ScoreBadge, StatusBadge, money, Spinner, ErrorNote } from '../../components/ui';
 
 interface FullLead extends Lead {
@@ -17,9 +18,13 @@ interface Insights {
   scoreReason?: string | null;
 }
 
+// Draft states that can still be sent (i.e. not already sent/delivered/rejected).
+const SENDABLE = ['PENDING_APPROVAL', 'APPROVED', 'SCHEDULED', 'FAILED'];
+
 export default function LeadDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [lead, setLead] = useState<FullLead | null>(null);
   const [insights, setInsights] = useState<Insights | null>(null);
   const [note, setNote] = useState('');
@@ -45,6 +50,26 @@ export default function LeadDetail() {
     setError('');
     try {
       await api.post(`/leads/${id}/draft`, { type });
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Send a drafted message now: approve-and-send if it's still pending, else
+  // (re)send an already-approved/failed one. The server enforces the consent gate.
+  async function sendNow(m: Message) {
+    if (!confirm(`Send this ${m.type.toLowerCase()} now?`)) return;
+    setBusy(true);
+    setError('');
+    try {
+      if (m.status === 'PENDING_APPROVAL') {
+        await api.post(`/messages/${m.id}/approve`, { sendNow: true });
+      } else {
+        await api.post(`/messages/${m.id}/send`);
+      }
       await load();
     } catch (e) {
       setError((e as Error).message);
@@ -149,9 +174,19 @@ export default function LeadDetail() {
                     <div className="text-xs text-slate-400">{new Date(item.at).toLocaleString()}</div>
                     {item.kind === 'msg' ? (
                       <div>
-                        <span className="badge bg-slate-100 text-slate-600">{item.m.type}</span>{' '}
-                        <span className="badge bg-blue-50 text-blue-700">{item.m.status}</span>
-                        <p className="mt-1 text-slate-700">{item.m.content}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <span className="badge bg-slate-100 text-slate-600">{item.m.type}</span>{' '}
+                            <span className="badge bg-blue-50 text-blue-700">{item.m.status}</span>
+                          </div>
+                          {user?.role === 'ADMIN' && SENDABLE.includes(item.m.status) && (
+                            <button className="btn-primary text-xs" disabled={busy} onClick={() => sendNow(item.m)}>
+                              Send now
+                            </button>
+                          )}
+                        </div>
+                        {item.m.subject && <p className="mt-1 text-xs font-medium text-slate-500">Subject: {item.m.subject}</p>}
+                        <p className="mt-1 whitespace-pre-wrap text-slate-700">{item.m.content}</p>
                       </div>
                     ) : (
                       <p className="text-slate-700">📝 {item.n.text}</p>
