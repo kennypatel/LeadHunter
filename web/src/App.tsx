@@ -23,6 +23,7 @@ import Approvals from './pages/app/Approvals';
 import Onboarding from './pages/app/Onboarding';
 import Admin from './pages/app/Admin';
 import SalesTemplates from './pages/app/SalesTemplates';
+import Settings from './pages/app/Settings';
 
 function Protected({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -54,6 +55,7 @@ export default function App() {
       <Route path="/app/approvals" element={<Protected><Approvals /></Protected>} />
       <Route path="/app/onboarding" element={<Protected><Onboarding /></Protected>} />
       <Route path="/app/sales-templates" element={<Protected><SalesTemplates /></Protected>} />
+      <Route path="/app/settings" element={<Protected><Settings /></Protected>} />
       <Route path="/app/admin" element={<Protected><Admin /></Protected>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />

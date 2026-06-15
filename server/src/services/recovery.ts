@@ -76,8 +76,9 @@ export async function generateDraft(opts: GenerateDraftOptions) {
       companyName: lead.name || 'your company',
       city: lead.company.serviceArea || 'your area',
       senderName: senderName || senderCompany,
+      senderTitle: 'Founder & CEO',
       senderCompany,
-      calendarLink: "just reply and we'll find a time",
+      calendarLink: lead.company.calendarLink || "just reply and we'll find a time",
     };
     draft = {
       subject: tmpl.subject ? renderTemplate(tmpl.subject, tokens) : undefined,

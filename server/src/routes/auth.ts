@@ -115,6 +115,23 @@ router.get(
   })
 );
 
+// Update the signed-in user's own profile (currently just their display name,
+// which is used as the sender name in sales drafts).
+const profileSchema = z.object({ name: z.string().min(1) });
+router.patch(
+  '/profile',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const { name } = profileSchema.parse(req.body);
+    const user = await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { name },
+      select: { id: true, email: true, name: true, role: true, companyId: true },
+    });
+    res.json({ user });
+  })
+);
+
 router.get(
   '/verify',
   asyncHandler(async (req, res) => {

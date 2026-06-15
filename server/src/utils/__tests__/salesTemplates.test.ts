@@ -6,7 +6,8 @@ const tokens = {
   firstName: 'Dana',
   companyName: 'Summit Roofing',
   city: 'Essex County',
-  senderName: 'Sam',
+  senderName: 'Kenny Patel',
+  senderTitle: 'Founder & CEO',
   senderCompany: 'KSP Marketing',
   calendarLink: 'just reply and we will find a time',
 };
