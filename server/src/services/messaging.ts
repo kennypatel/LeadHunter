@@ -138,7 +138,9 @@ export async function sendMessage(messageId: string, actorId?: string) {
     include: { lead: true, company: true },
   });
   if (!message) throw new SendBlockedError('Message not found');
-  if (message.status !== 'APPROVED' && message.status !== 'FAILED') {
+  // QUEUED is included so a send that was interrupted mid-flight (e.g. a host
+  // dropped the SMTP connection) can be safely retried instead of being stuck.
+  if (!['APPROVED', 'FAILED', 'QUEUED'].includes(message.status)) {
     throw new SendBlockedError(`Message must be APPROVED to send (current: ${message.status})`);
   }
   // Cap manual + scheduled retries so a permanently-broken recipient can't be
@@ -207,11 +209,18 @@ export async function sendMessage(messageId: string, actorId?: string) {
 /** Retry every APPROVED/FAILED message that is due. Returns counts. */
 export async function processDueMessages(): Promise<{ sent: number; failed: number; blocked: number }> {
   const now = new Date();
+  // Recover messages stuck in QUEUED for >2 min (an interrupted send).
+  const staleQueued = new Date(now.getTime() - 2 * 60 * 1000);
   const due = await prisma.message.findMany({
     where: {
-      status: { in: ['APPROVED', 'FAILED'] },
       retryCount: { lt: 3 },
-      OR: [{ scheduledFor: null }, { scheduledFor: { lte: now } }],
+      OR: [
+        {
+          status: { in: ['APPROVED', 'FAILED'] },
+          OR: [{ scheduledFor: null }, { scheduledFor: { lte: now } }],
+        },
+        { status: 'QUEUED', updatedAt: { lte: staleQueued } },
+      ],
     },
     take: 50,
   });

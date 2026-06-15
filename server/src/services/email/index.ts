@@ -40,6 +40,10 @@ class SmtpEmailProvider implements EmailProvider {
         port: env.email.port,
         secure: env.email.port === 465,
         auth: { user: env.email.user, pass: env.email.pass },
+        // Fail fast instead of hanging if the host blocks SMTP ports.
+        connectionTimeout: 12000,
+        greetingTimeout: 12000,
+        socketTimeout: 15000,
       });
       const info = await transport.sendMail({
         from: params.from ?? env.email.from,
@@ -55,10 +59,49 @@ class SmtpEmailProvider implements EmailProvider {
   }
 }
 
+// SendGrid via the HTTPS Web API (port 443) — works on hosts that block SMTP
+// ports (e.g. Render's free tier). Needs SENDGRID_API_KEY and a verified sender.
+class SendGridEmailProvider implements EmailProvider {
+  async send(params: SendEmailParams): Promise<SendResult> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.email.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: params.to }] }],
+          from: { email: params.from ?? env.email.from },
+          subject: params.subject,
+          content: [{ type: 'text/plain', value: params.body }],
+        }),
+        signal: controller.signal,
+      });
+      // SendGrid returns 202 Accepted with an empty body on success.
+      if (res.status === 202) {
+        return { ok: true, providerId: res.headers.get('x-message-id') ?? undefined };
+      }
+      const text = await res.text();
+      logger.error('[email:sendgrid] send failed', { status: res.status, text: text.slice(0, 300) });
+      return { ok: false, error: `SendGrid ${res.status}: ${text.slice(0, 200)}` };
+    } catch (err) {
+      logger.error('[email:sendgrid] threw', { err: String(err) });
+      return { ok: false, error: String(err) };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
+
 let provider: EmailProvider | null = null;
 
 export function getEmailProvider(): EmailProvider {
   if (provider) return provider;
-  provider = env.email.provider === 'smtp' ? new SmtpEmailProvider() : new ConsoleEmailProvider();
+  if (env.email.provider === 'sendgrid') provider = new SendGridEmailProvider();
+  else if (env.email.provider === 'smtp') provider = new SmtpEmailProvider();
+  else provider = new ConsoleEmailProvider();
   return provider;
 }
