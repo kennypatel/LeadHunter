@@ -141,14 +141,19 @@ export async function runBulkRecovery(params: {
   workflow?: Workflow;
   limit?: number;
   actorId?: string;
+  style?: 'recovery' | 'sales';
+  // When true, only leads that don't already have a message (i.e. haven't been
+  // drafted/contacted yet) are processed.
+  skipExisting?: boolean;
 }): Promise<{ queued: number; skipped: number }> {
   const leads = await prisma.lead.findMany({
     where: {
       companyId: params.companyId,
       unsubscribed: false,
       status: { notIn: ['BOOKED', 'CLOSED'] },
+      ...(params.skipExisting ? { messages: { none: {} } } : {}),
     },
-    take: params.limit ?? 25,
+    take: params.limit ?? 500,
     orderBy: { createdAt: 'asc' },
   });
 
@@ -181,7 +186,13 @@ export async function runBulkRecovery(params: {
       skipped++;
       continue;
     }
-    await generateDraft({ leadId: lead.id, type: params.type, workflow: params.workflow, actorId: params.actorId });
+    await generateDraft({
+      leadId: lead.id,
+      type: params.type,
+      workflow: params.workflow,
+      style: params.style,
+      actorId: params.actorId,
+    });
     queued++;
   }
 
@@ -190,7 +201,7 @@ export async function runBulkRecovery(params: {
     action: 'recovery.bulk',
     entity: 'Company',
     entityId: params.companyId,
-    metadata: { queued, skipped, type: params.type },
+    metadata: { queued, skipped, type: params.type, style: params.style ?? 'recovery' },
   });
 
   return { queued, skipped };

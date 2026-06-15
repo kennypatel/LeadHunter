@@ -123,15 +123,26 @@ router.get(
 const bulkSchema = z.object({
   type: z.enum(['EMAIL', 'SMS']),
   workflow: z.enum(['missed_call', 're_engage', 'estimate_followup']).optional(),
-  limit: z.number().int().min(1).max(100).optional(),
+  limit: z.number().int().min(1).max(500).optional(),
+  skipExisting: z.boolean().optional(),
 });
 router.post(
   '/bulk-recovery',
   asyncHandler(async (req, res) => {
     const companyId = scopedCompanyId(req, req.body.companyId);
     if (!companyId) return res.status(400).json({ error: 'No company in scope' });
-    const { type, workflow, limit } = bulkSchema.parse(req.body);
-    const result = await runBulkRecovery({ companyId, type, workflow, limit, actorId: req.user!.id });
+    const { type, workflow, limit, skipExisting } = bulkSchema.parse(req.body);
+    // Operators draft sales outreach; clients get the recovery copy.
+    const style = req.user!.role === 'ADMIN' ? 'sales' : 'recovery';
+    const result = await runBulkRecovery({
+      companyId,
+      type,
+      workflow,
+      limit,
+      style,
+      skipExisting,
+      actorId: req.user!.id,
+    });
     res.json(result);
   })
 );

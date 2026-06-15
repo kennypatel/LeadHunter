@@ -54,13 +54,22 @@ export default function Leads() {
     }
   }
 
-  async function bulkRecovery() {
+  const [drafting, setDrafting] = useState(false);
+  async function draftEmailToAll() {
     setNotice('');
+    setError('');
+    setDrafting(true);
     try {
-      const res = await api.post<{ queued: number; skipped: number }>('/dashboard/bulk-recovery', { type: 'SMS' });
-      setNotice(`Queued ${res.queued} drafts for approval (skipped ${res.skipped}).`);
+      // Draft an email for every lead with an email that doesn't already have one.
+      const res = await api.post<{ queued: number; skipped: number }>('/dashboard/bulk-recovery', {
+        type: 'EMAIL',
+        skipExisting: true,
+      });
+      setNotice(`Drafted ${res.queued} email(s) — review them in Approvals (skipped ${res.skipped}).`);
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setDrafting(false);
     }
   }
 
@@ -82,7 +91,9 @@ export default function Leads() {
           <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={(e) => e.target.files?.[0] && importCsv(e.target.files[0])} />
           <button className="btn-secondary" onClick={() => setShowAdd((v) => !v)}>Add lead</button>
           <button className="btn-secondary" onClick={() => fileRef.current?.click()}>Import CSV</button>
-          <button className="btn-primary" onClick={bulkRecovery}>Bulk recovery (SMS)</button>
+          <button className="btn-primary" onClick={draftEmailToAll} disabled={drafting}>
+            {drafting ? 'Drafting…' : 'Draft email to all'}
+          </button>
         </div>
       </div>
 
