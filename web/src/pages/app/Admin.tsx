@@ -66,6 +66,18 @@ export default function Admin() {
     load();
   }
 
+  async function clearPhones() {
+    if (!confirm('Permanently delete the phone number on EVERY lead? This cannot be undone.')) return;
+    setNotice('');
+    try {
+      const res = await api.post<{ cleared: number }>('/admin/clear-phone-numbers');
+      setNotice(`Cleared phone numbers from ${res.cleared} lead(s).`);
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   if (loading) return <AppLayout><Spinner /></AppLayout>;
 
   return (
@@ -75,6 +87,7 @@ export default function Admin() {
         <div className="flex gap-2">
           <button className="btn-secondary" onClick={retry}>Retry due jobs</button>
           <a className="btn-secondary" href="/api/admin/export.json">Export JSON</a>
+          <button className="btn-secondary text-red-600" onClick={clearPhones}>Clear all phone numbers</button>
         </div>
       </div>
       {error && <div className="mt-4"><ErrorNote message={error} /></div>}
