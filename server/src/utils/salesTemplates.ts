@@ -141,3 +141,9 @@ If it pays for itself (it usually does), we move to a monthly retainer to keep i
 Want me to get the pilot set up? {{calendarLink}}`,
   },
 ];
+
+/** The default sales template used when an operator drafts an outreach message. */
+export function getSalesTemplate(type: 'EMAIL' | 'SMS'): SalesTemplate {
+  const id = type === 'EMAIL' ? 'email-1-opener' : 'sms-intro';
+  return SALES_TEMPLATES.find((t) => t.id === id) ?? SALES_TEMPLATES[0];
+}

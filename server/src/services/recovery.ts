@@ -3,8 +3,9 @@
 import { prisma } from '../lib/prisma';
 import { audit } from './audit';
 import { getAiProvider } from './ai';
-import { Workflow } from '../utils/templates';
+import { Workflow, firstName, renderTemplate } from '../utils/templates';
 import { scoreLead } from '../utils/scoring';
+import { getSalesTemplate } from '../utils/salesTemplates';
 
 /** (Re)classify a single lead and persist its score + reason. */
 export async function classifyAndSave(leadId: string) {
@@ -40,6 +41,9 @@ export interface GenerateDraftOptions {
   type: 'EMAIL' | 'SMS';
   workflow?: Workflow;
   actorId?: string;
+  // 'recovery' = roofer → homeowner follow-up (default). 'sales' = operator →
+  // roofing-company outreach, drafted from the curated sales templates.
+  style?: 'recovery' | 'sales';
 }
 
 /**
@@ -54,27 +58,53 @@ export async function generateDraft(opts: GenerateDraftOptions) {
   if (!lead) throw new Error('Lead not found');
   if (lead.unsubscribed) throw new Error('Lead unsubscribed — cannot draft outreach');
 
-  const workflow = opts.workflow ?? inferWorkflow(lead.source, lead.status);
+  let draft: { subject?: string; body: string; generatedBy: string };
 
-  // Pull short history for personalization.
-  const history = await prisma.message.findMany({
-    where: { leadId: lead.id },
-    orderBy: { createdAt: 'desc' },
-    take: 3,
-    select: { content: true },
-  });
-
-  const draft = await getAiProvider().draftMessage({
-    workflow,
-    type: opts.type,
-    context: {
-      leadName: lead.name,
-      companyName: lead.company.name,
-      companyPhone: lead.company.phone,
-      estimatedValue: lead.estimatedValue,
-    },
-    history: history.map((h) => h.content),
-  });
+  if (opts.style === 'sales') {
+    // Use the curated sales opener (email) / intro text (SMS). Every token gets
+    // a concrete fallback so the draft never contains an empty gap or a literal
+    // {{placeholder}} — the operator can still edit before sending.
+    const tmpl = getSalesTemplate(opts.type);
+    let senderName: string | undefined;
+    if (opts.actorId) {
+      const actor = await prisma.user.findUnique({ where: { id: opts.actorId }, select: { name: true } });
+      senderName = actor?.name ?? undefined;
+    }
+    const senderCompany = lead.company.name || 'our team';
+    const tokens = {
+      firstName: firstName(lead.name),
+      companyName: lead.name || 'your company',
+      city: lead.company.serviceArea || 'your area',
+      senderName: senderName || senderCompany,
+      senderCompany,
+      calendarLink: "just reply and we'll find a time",
+    };
+    draft = {
+      subject: tmpl.subject ? renderTemplate(tmpl.subject, tokens) : undefined,
+      body: renderTemplate(tmpl.body, tokens),
+      generatedBy: 'sales_template',
+    };
+  } else {
+    const workflow = opts.workflow ?? inferWorkflow(lead.source, lead.status);
+    // Pull short history for personalization.
+    const history = await prisma.message.findMany({
+      where: { leadId: lead.id },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+      select: { content: true },
+    });
+    draft = await getAiProvider().draftMessage({
+      workflow,
+      type: opts.type,
+      context: {
+        leadName: lead.name,
+        companyName: lead.company.name,
+        companyPhone: lead.company.phone,
+        estimatedValue: lead.estimatedValue,
+      },
+      history: history.map((h) => h.content),
+    });
+  }
 
   const message = await prisma.message.create({
     data: {
@@ -94,7 +124,7 @@ export async function generateDraft(opts: GenerateDraftOptions) {
     action: 'message.drafted',
     entity: 'Message',
     entityId: message.id,
-    metadata: { workflow, type: opts.type, generatedBy: draft.generatedBy },
+    metadata: { style: opts.style ?? 'recovery', workflow: opts.workflow, type: opts.type, generatedBy: draft.generatedBy },
   });
 
   return message;

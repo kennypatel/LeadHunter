@@ -269,13 +269,23 @@ router.post(
 const draftSchema = z.object({
   type: z.enum(['EMAIL', 'SMS']),
   workflow: z.enum(['missed_call', 're_engage', 'estimate_followup']).optional(),
+  style: z.enum(['recovery', 'sales']).optional(),
 });
 router.post(
   '/:id/draft',
   asyncHandler(async (req, res) => {
     await assertLeadScope(req, req.params.id);
-    const { type, workflow } = draftSchema.parse(req.body);
-    const message = await generateDraft({ leadId: req.params.id, type, workflow, actorId: req.user!.id });
+    const { type, workflow, style } = draftSchema.parse(req.body);
+    // Operators (admins) pitch roofing companies, so default their drafts to the
+    // sales templates; clients get the roofer→homeowner recovery copy.
+    const resolvedStyle = style ?? (req.user!.role === 'ADMIN' ? 'sales' : 'recovery');
+    const message = await generateDraft({
+      leadId: req.params.id,
+      type,
+      workflow,
+      style: resolvedStyle,
+      actorId: req.user!.id,
+    });
     res.status(201).json({ message });
   })
 );
