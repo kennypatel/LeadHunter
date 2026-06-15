@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
+import fs from 'fs';
+import path from 'path';
 import { env } from './config/env';
 import { prisma } from './lib/prisma';
 import { errorHandler, notFound } from './middleware/error';
@@ -61,6 +63,16 @@ export function createApp() {
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/admin', adminRoutes);
   app.use('/api/sales', salesRoutes);
+
+  // Single-service mode: serve the built React app and let the SPA router handle
+  // non-/api paths. Unknown /api routes still fall through to the JSON 404.
+  if (env.serveWeb && fs.existsSync(env.webDistPath)) {
+    app.use(express.static(env.webDistPath));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api')) return next();
+      res.sendFile(path.join(env.webDistPath, 'index.html'));
+    });
+  }
 
   app.use(notFound);
   app.use(errorHandler);
