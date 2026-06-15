@@ -112,11 +112,21 @@ async function main() {
     }
   }
 
-  await prisma.featureFlag.upsert({
-    where: { key: 'auto_send' },
-    update: {},
-    create: { key: 'auto_send', enabled: false, description: 'Global kill-switch for any automated sending' },
-  });
+  // Live-send kill-switches — all OFF by default. Real outreach cannot leave
+  // the system until these are explicitly enabled (per channel). SMS stays
+  // gated until A2P 10DLC registration is complete.
+  const flags = [
+    { key: 'live_sending', description: 'Master switch: allow real (non-console) message sending' },
+    { key: 'email_sending', description: 'Allow real email sends (requires verified domain + SPF/DKIM)' },
+    { key: 'sms_sending', description: 'Allow real SMS sends (requires A2P 10DLC + per-lead consent)' },
+  ];
+  for (const f of flags) {
+    await prisma.featureFlag.upsert({
+      where: { key: f.key },
+      update: {},
+      create: { key: f.key, enabled: false, description: f.description },
+    });
+  }
 
   console.log('Seed complete.');
   console.log('  Admin login:  admin@leakhunter.app / admin1234');

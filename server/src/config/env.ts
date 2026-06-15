@@ -22,6 +22,11 @@ export const env = {
   // CORS / web origin
   webOrigin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
   appBaseUrl: process.env.APP_BASE_URL ?? 'http://localhost:4000',
+  // Public-facing web URL used in email footers (unsubscribe link). Defaults to
+  // the first configured web origin.
+  publicUrl: process.env.PUBLIC_URL ?? (process.env.WEB_ORIGIN ?? 'http://localhost:5173').split(',')[0].trim(),
+  // Physical mailing address for the CAN-SPAM footer when a company has none.
+  businessAddress: process.env.BUSINESS_ADDRESS ?? '',
   // Providers (all optional — fall back to console/no-op in dev)
   ai: {
     provider: process.env.AI_PROVIDER ?? 'mock', // mock | openai

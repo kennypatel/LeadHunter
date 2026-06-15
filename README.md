@@ -160,10 +160,21 @@ to real providers in production.
 
 ## Compliance & safety
 - **Approval gates:** drafts land in `PENDING_APPROVAL`; nothing sends without a human.
+- **Live-send kill-switch:** real (non-console) sends are blocked unless the
+  `live_sending` + per-channel (`email_sending` / `sms_sending`) feature flags
+  are enabled — all OFF by default, so providers can be wired and tested safely.
 - **Consent tracking:** per-channel email/SMS consent; sends blocked without it.
-- **Unsubscribe:** public endpoint + footer link immediately opts a lead out and marks them DEAD.
-- **Frequency limits:** configurable weekly cap enforced pre-send.
+- **CAN-SPAM email footer:** every outgoing email automatically includes the
+  sender name, a physical mailing address, and a working unsubscribe link.
+- **Unsubscribe:** public endpoint + email footer link, plus an inbound Twilio
+  **STOP webhook** (`POST /api/webhooks/twilio/sms`) — all immediately opt a
+  lead out and mark them DEAD.
+- **Frequency limits:** configurable weekly cap enforced pre-send (transient, so
+  rate-limited messages retry later instead of being dropped).
 - **Audit log:** every draft, approval, send, failure, and opt-out is recorded.
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the go-live checklist (10DLC,
+domain verification, enabling the flags).
 
 ## Deployment
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and

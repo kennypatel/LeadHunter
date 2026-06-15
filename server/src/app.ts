@@ -15,6 +15,7 @@ import dashboardRoutes from './routes/dashboard';
 import adminRoutes from './routes/admin';
 import publicRoutes from './routes/public';
 import salesRoutes from './routes/sales';
+import webhookRoutes from './routes/webhooks';
 
 export function createApp() {
   const app = express();
@@ -53,6 +54,7 @@ export function createApp() {
 
   app.use('/api/auth', authRoutes);
   app.use('/api/public', publicRoutes);
+  app.use('/api/webhooks', webhookRoutes);
   app.use('/api/leads', leadRoutes);
   app.use('/api/companies', companyRoutes);
   app.use('/api/messages', messageRoutes);

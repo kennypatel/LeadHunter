@@ -7,6 +7,8 @@ import { logger } from '../lib/logger';
 import { audit } from './audit';
 import { getEmailProvider } from './email';
 import { getSmsProvider } from './sms';
+import { isFlagEnabled, SEND_FLAGS } from './featureFlags';
+import { appendEmailFooter, buildEmailFooter, unsubscribeUrl } from '../utils/compliance';
 
 export class SendBlockedError extends Error {
   // Transient blocks (e.g. the weekly frequency cap) clear on their own, so the
@@ -20,6 +22,25 @@ export class SendBlockedError extends Error {
 }
 
 const WEEK_MS = 1000 * 60 * 60 * 24 * 7;
+
+/**
+ * Live-send kill-switch. Real (non-console) sends are blocked unless BOTH the
+ * master `live_sending` flag and the per-channel flag are enabled. The console
+ * providers are no-ops (they only log), so they are always allowed — this keeps
+ * local/dev/test flows working while real outreach stays gated by default.
+ */
+async function assertChannelLive(type: 'EMAIL' | 'SMS'): Promise<void> {
+  const providerIsReal = type === 'EMAIL' ? env.email.provider !== 'console' : env.sms.provider !== 'console';
+  if (!providerIsReal) return;
+  const channelFlag = type === 'EMAIL' ? SEND_FLAGS.email : SEND_FLAGS.sms;
+  const [masterOn, channelOn] = await Promise.all([isFlagEnabled(SEND_FLAGS.live), isFlagEnabled(channelFlag)]);
+  if (!masterOn || !channelOn) {
+    throw new SendBlockedError(
+      `Live ${type} sending is disabled — enable feature flags '${SEND_FLAGS.live}' and '${channelFlag}'`,
+      true // transient: flipping the flag on lets queued messages go out
+    );
+  }
+}
 
 /** Pre-send compliance gate. Throws SendBlockedError when a send is not allowed. */
 export async function assertSendAllowed(messageId: string): Promise<void> {
@@ -112,7 +133,10 @@ export async function rejectMessage(messageId: string, approverId: string, reaso
  * Applies the compliance gate, records status transitions, and supports retry.
  */
 export async function sendMessage(messageId: string, actorId?: string) {
-  const message = await prisma.message.findUnique({ where: { id: messageId }, include: { lead: true } });
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { lead: true, company: true },
+  });
   if (!message) throw new SendBlockedError('Message not found');
   if (message.status !== 'APPROVED' && message.status !== 'FAILED') {
     throw new SendBlockedError(`Message must be APPROVED to send (current: ${message.status})`);
@@ -124,6 +148,7 @@ export async function sendMessage(messageId: string, actorId?: string) {
   }
 
   await assertSendAllowed(messageId);
+  await assertChannelLive(message.type);
 
   await prisma.message.update({ where: { id: messageId }, data: { status: 'QUEUED' } });
 
@@ -132,10 +157,17 @@ export async function sendMessage(messageId: string, actorId?: string) {
   let result: { ok: boolean; providerId?: string; error?: string };
   try {
     if (message.type === 'EMAIL') {
+      // CAN-SPAM: every email carries the sender, a physical address, and a
+      // working unsubscribe link.
+      const footer = buildEmailFooter({
+        companyName: message.company.name,
+        address: message.company.address || env.businessAddress || null,
+        unsubscribeUrl: unsubscribeUrl(env.publicUrl, message.leadId),
+      });
       result = await getEmailProvider().send({
         to: message.lead.email!,
         subject: message.subject ?? 'A quick follow-up',
-        body: message.content,
+        body: appendEmailFooter(message.content, footer),
       });
     } else {
       result = await getSmsProvider().send({ to: message.lead.phone!, body: message.content });

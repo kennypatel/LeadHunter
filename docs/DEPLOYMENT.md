@@ -32,8 +32,29 @@ TWILIO_AUTH_TOKEN=...
 TWILIO_FROM=+1...
 ```
 
-> Using `smtp` requires `nodemailer` (`npm i nodemailer` in `server/`). The
-> default `console`/`mock`/`twilio-via-REST` providers need no extra packages.
+> `nodemailer` (SMTP) and the Twilio REST integration ship with the server, so
+> no extra packages are needed to send.
+
+## Going live with real sending (safety-gated)
+
+Even with real providers configured above, **no message is sent until you flip
+the kill-switch feature flags** (all OFF by default). This is intentional so you
+can wire and test providers without risk.
+
+1. Configure `EMAIL_PROVIDER=smtp` / `SMS_PROVIDER=twilio` and credentials.
+2. Set `PUBLIC_URL` (for email unsubscribe links) and `BUSINESS_ADDRESS`
+   (CAN-SPAM footer).
+3. In **Admin → Feature flags**, enable:
+   - `live_sending` — master switch
+   - `email_sending` — once your domain has SPF/DKIM/DMARC verified
+   - `sms_sending` — **only after** A2P 10DLC registration and with per-lead
+     SMS consent (TCPA). Leave OFF until then.
+4. Point your Twilio number's inbound "A message comes in" webhook to
+   `https://<api-host>/api/webhooks/twilio/sms` so STOP replies auto-unsubscribe
+   leads. (Validate `X-Twilio-Signature` before exposing this publicly.)
+
+Every approved email automatically gets a CAN-SPAM footer (sender name, mailing
+address, unsubscribe link). Human approval is always required before send.
 
 ## 3. Database
 ```bash
