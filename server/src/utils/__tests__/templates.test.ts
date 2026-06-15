@@ -1,4 +1,4 @@
-import { renderTemplate, buildTokens, getBuiltInTemplate, firstName } from '../templates';
+import { renderTemplate, buildTokens, getBuiltInTemplate, firstName, fillTokensPartial } from '../templates';
 
 describe('renderTemplate', () => {
   it('replaces known tokens', () => {
@@ -11,6 +11,19 @@ describe('renderTemplate', () => {
 
   it('replaces unknown tokens with empty string (never leaks placeholders)', () => {
     expect(renderTemplate('Hi {{missing}}!', {})).toBe('Hi !');
+  });
+});
+
+describe('fillTokensPartial', () => {
+  it('fills known tokens and leaves the rest as visible placeholders', () => {
+    const out = fillTokensPartial('Hi {{firstName}} at {{companyName}}, from {{senderName}}', {
+      firstName: 'Dana',
+      senderName: 'Sam',
+    });
+    expect(out).toBe('Hi Dana at {{companyName}}, from Sam');
+  });
+  it('treats empty values as not provided (keeps placeholder)', () => {
+    expect(fillTokensPartial('Hi {{firstName}}', { firstName: '' })).toBe('Hi {{firstName}}');
   });
 });
 
