@@ -70,8 +70,21 @@ export default function LeadDetail() {
   }
 
   async function setStatus(status: string) {
-    await api.patch(`/leads/${id}`, { status });
-    load();
+    try {
+      await api.patch(`/leads/${id}`, { status });
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function patchLead(data: Record<string, boolean>) {
+    try {
+      await api.patch(`/leads/${id}`, data);
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
   }
 
   if (error && !lead) return <AppLayout><ErrorNote message={error} /></AppLayout>;
@@ -165,10 +178,42 @@ export default function LeadDetail() {
             <dl className="mt-2 space-y-1 text-sm">
               <div className="flex justify-between"><dt className="text-slate-500">Estimated value</dt><dd>{money(lead.estimatedValue)}</dd></div>
               <div className="flex justify-between"><dt className="text-slate-500">Source</dt><dd>{lead.source || '—'}</dd></div>
-              <div className="flex justify-between"><dt className="text-slate-500">Email consent</dt><dd>{lead.consentEmail ? 'Yes' : 'No'}</dd></div>
-              <div className="flex justify-between"><dt className="text-slate-500">SMS consent</dt><dd>{lead.consentSms ? 'Yes' : 'No'}</dd></div>
-              <div className="flex justify-between"><dt className="text-slate-500">Unsubscribed</dt><dd>{lead.unsubscribed ? 'Yes' : 'No'}</dd></div>
             </dl>
+          </div>
+
+          <div className="card">
+            <h2 className="font-semibold text-slate-900">Consent</h2>
+            <p className="mt-1 text-xs text-slate-400">
+              Only mark consent you genuinely have — required before sending (TCPA / CAN-SPAM).
+            </p>
+            <div className="mt-3 space-y-2 text-sm">
+              <label className="flex items-center justify-between">
+                <span className="text-slate-600">Email consent</span>
+                <input
+                  type="checkbox"
+                  checked={lead.consentEmail}
+                  disabled={lead.unsubscribed}
+                  onChange={(e) => patchLead({ consentEmail: e.target.checked })}
+                />
+              </label>
+              <label className="flex items-center justify-between">
+                <span className="text-slate-600">SMS consent</span>
+                <input
+                  type="checkbox"
+                  checked={lead.consentSms}
+                  disabled={lead.unsubscribed}
+                  onChange={(e) => patchLead({ consentSms: e.target.checked })}
+                />
+              </label>
+              <label className="flex items-center justify-between">
+                <span className="text-slate-600">Unsubscribed (do not contact)</span>
+                <input
+                  type="checkbox"
+                  checked={lead.unsubscribed}
+                  onChange={(e) => patchLead({ unsubscribed: e.target.checked })}
+                />
+              </label>
+            </div>
           </div>
         </div>
       </div>

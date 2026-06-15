@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom';
 import { AppLayout } from '../../components/Layouts';
 import { api, Lead } from '../../api';
 import { ScoreBadge, StatusBadge, money, Spinner, ErrorNote } from '../../components/ui';
+import AddLeadForm from './AddLeadForm';
 
 export default function Leads() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [q, setQ] = useState('');
   const [scoreFilter, setScoreFilter] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -64,10 +66,22 @@ export default function Leads() {
         <h1 className="text-2xl font-bold text-slate-900">Leads</h1>
         <div className="flex gap-2">
           <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={(e) => e.target.files?.[0] && importCsv(e.target.files[0])} />
+          <button className="btn-secondary" onClick={() => setShowAdd((v) => !v)}>Add lead</button>
           <button className="btn-secondary" onClick={() => fileRef.current?.click()}>Import CSV</button>
           <button className="btn-primary" onClick={bulkRecovery}>Bulk recovery (SMS)</button>
         </div>
       </div>
+
+      {showAdd && (
+        <AddLeadForm
+          onClose={() => setShowAdd(false)}
+          onCreated={() => {
+            setShowAdd(false);
+            setNotice('Lead added.');
+            load();
+          }}
+        />
+      )}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <input className="input max-w-xs" placeholder="Search name, email, phone…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && load()} />
