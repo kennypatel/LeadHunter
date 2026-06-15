@@ -82,16 +82,28 @@ export function AppLayout({ children }: { children: ReactNode }) {
               </NavLink>
             ))}
             {user?.role === 'ADMIN' && (
-              <NavLink
-                to="/app/admin"
-                className={({ isActive }) =>
-                  `rounded-md px-3 py-2 text-sm font-medium ${
-                    isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50'
-                  }`
-                }
-              >
-                Admin
-              </NavLink>
+              <>
+                <NavLink
+                  to="/app/sales-templates"
+                  className={({ isActive }) =>
+                    `rounded-md px-3 py-2 text-sm font-medium ${
+                      isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50'
+                    }`
+                  }
+                >
+                  Sales Templates
+                </NavLink>
+                <NavLink
+                  to="/app/admin"
+                  className={({ isActive }) =>
+                    `rounded-md px-3 py-2 text-sm font-medium ${
+                      isActive ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50'
+                    }`
+                  }
+                >
+                  Admin
+                </NavLink>
+              </>
             )}
           </nav>
         </aside>

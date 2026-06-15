@@ -6,9 +6,18 @@ import { prisma } from '../lib/prisma';
 import { authenticate, requireRole } from '../middleware/auth';
 import { asyncHandler, HttpError } from '../middleware/error';
 import { computeRoi } from '../utils/roi';
+import { SALES_TEMPLATES, SALES_TOKENS } from '../utils/salesTemplates';
 
 const router = Router();
 router.use(authenticate, requireRole('ADMIN'));
+
+// Curated outreach templates for signing roofing companies as clients.
+router.get(
+  '/templates',
+  asyncHandler(async (_req, res) => {
+    res.json({ templates: SALES_TEMPLATES, tokens: SALES_TOKENS });
+  })
+);
 
 export const PRICING = {
   audit: { name: 'Audit', priceRange: [250, 500], description: 'Full lead-leak audit + recovery plan' },

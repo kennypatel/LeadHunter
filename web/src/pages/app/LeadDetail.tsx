@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AppLayout } from '../../components/Layouts';
 import { api, Lead, Message } from '../../api';
 import { ScoreBadge, StatusBadge, money, Spinner, ErrorNote } from '../../components/ui';
@@ -19,6 +19,7 @@ interface Insights {
 
 export default function LeadDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [lead, setLead] = useState<FullLead | null>(null);
   const [insights, setInsights] = useState<Insights | null>(null);
   const [note, setNote] = useState('');
@@ -87,6 +88,18 @@ export default function LeadDetail() {
     }
   }
 
+  async function deleteLead() {
+    if (!confirm(`Delete "${lead?.name}"? This permanently removes the lead and all its notes, tasks, and messages.`)) {
+      return;
+    }
+    try {
+      await api.del(`/leads/${id}`);
+      navigate('/app/leads');
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   if (error && !lead) return <AppLayout><ErrorNote message={error} /></AppLayout>;
   if (!lead) return <AppLayout><Spinner /></AppLayout>;
 
@@ -107,6 +120,7 @@ export default function LeadDetail() {
           <button className="btn-secondary" onClick={() => draft('SMS')} disabled={busy}>Draft SMS</button>
           <button className="btn-secondary" onClick={() => draft('EMAIL')} disabled={busy}>Draft Email</button>
           <button className="btn-primary" onClick={loadInsights}>AI insights</button>
+          <button className="btn-secondary text-red-600" onClick={deleteLead}>Delete</button>
         </div>
       </div>
 
