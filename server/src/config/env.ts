@@ -1,0 +1,47 @@
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+function required(key: string, fallback?: string): string {
+  const val = process.env[key] ?? fallback;
+  if (val === undefined) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+  return val;
+}
+
+export const env = {
+  nodeEnv: process.env.NODE_ENV ?? 'development',
+  isProd: process.env.NODE_ENV === 'production',
+  port: parseInt(process.env.PORT ?? '4000', 10),
+  databaseUrl: process.env.DATABASE_URL ?? '',
+  // Auth
+  jwtSecret: required('JWT_SECRET', 'dev-insecure-secret-change-me'),
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
+  cookieName: process.env.COOKIE_NAME ?? 'lh_token',
+  // CORS / web origin
+  webOrigin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
+  appBaseUrl: process.env.APP_BASE_URL ?? 'http://localhost:4000',
+  // Providers (all optional — fall back to console/no-op in dev)
+  ai: {
+    provider: process.env.AI_PROVIDER ?? 'mock', // mock | openai
+    apiKey: process.env.OPENAI_API_KEY ?? '',
+    model: process.env.AI_MODEL ?? 'gpt-4o-mini',
+  },
+  email: {
+    provider: process.env.EMAIL_PROVIDER ?? 'console', // console | smtp
+    host: process.env.SMTP_HOST ?? '',
+    port: parseInt(process.env.SMTP_PORT ?? '587', 10),
+    user: process.env.SMTP_USER ?? '',
+    pass: process.env.SMTP_PASS ?? '',
+    from: process.env.EMAIL_FROM ?? 'noreply@leakhunter.app',
+  },
+  sms: {
+    provider: process.env.SMS_PROVIDER ?? 'console', // console | twilio
+    accountSid: process.env.TWILIO_ACCOUNT_SID ?? '',
+    authToken: process.env.TWILIO_AUTH_TOKEN ?? '',
+    from: process.env.TWILIO_FROM ?? '',
+  },
+  // Frequency / safety limits
+  maxMessagesPerLeadPerWeek: parseInt(process.env.MAX_MESSAGES_PER_LEAD_PER_WEEK ?? '3', 10),
+};

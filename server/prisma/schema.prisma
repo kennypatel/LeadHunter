@@ -1,0 +1,308 @@
+// LeakHunter database schema
+// Revenue-recovery CRM for New Jersey roofing companies.
+// Generated for PostgreSQL via Prisma.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth & roles
+// ---------------------------------------------------------------------------
+
+enum Role {
+  ADMIN // the LeakHunter operator (you)
+  CLIENT // a roofing company owner
+  VIEWER // read-only
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String
+  name            String
+  role            Role      @default(CLIENT)
+  companyId       String?
+  company         Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  emailVerified   Boolean   @default(false)
+  verifyToken     String?
+  resetToken      String?
+  resetExpiresAt  DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  notes     Note[]
+  tasks     Task[]
+  auditLogs AuditLog[]
+
+  @@index([companyId])
+}
+
+// ---------------------------------------------------------------------------
+// CRM core
+// ---------------------------------------------------------------------------
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  address     String?
+  serviceArea String?
+  phone       String?
+  email       String?
+  website     String?
+  // Per-client safety switch. When false, no outreach can be auto-sent;
+  // everything goes through the human approval queue.
+  autoSendEnabled Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users    User[]
+  owners   Owner[]
+  leads    Lead[]
+  messages Message[]
+  templates Template[]
+  onboarding Onboarding?
+}
+
+model Owner {
+  id        String   @id @default(cuid())
+  name      String
+  role      String?
+  phone     String?
+  email     String?
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  RESPONDING
+  ESTIMATE
+  BOOKED
+  CLOSED
+}
+
+enum LeadScore {
+  HOT
+  WARM
+  COLD
+  STALE
+  DEAD
+}
+
+model Lead {
+  id              String     @id @default(cuid())
+  companyId       String
+  company         Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name            String
+  phone           String?
+  email           String?
+  source          String? // e.g. "missed_call", "web_form", "old_quote", "csv_import"
+  status          LeadStatus @default(NEW)
+  score           LeadScore  @default(COLD)
+  scoreReason     String? // AI / rule explanation of the score
+  estimatedValue  Int        @default(0) // dollars, used for ROI projections
+  notesText       String?
+  tags            String[]   @default([])
+  // Consent & compliance
+  consentEmail    Boolean    @default(false)
+  consentSms      Boolean    @default(false)
+  unsubscribed    Boolean    @default(false)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  lastContactedAt DateTime?
+
+  notes     Note[]
+  tasks     Task[]
+  messages  Message[]
+  pipeline  Pipeline?
+
+  @@index([companyId, status])
+  @@index([companyId, score])
+  @@index([phone])
+  @@index([email])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  text      String
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdBy User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+  CANCELLED
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  leadId      String?
+  lead        Lead?      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  ownerId     String?
+  owner       User?      @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  dueDate     DateTime?
+  status      TaskStatus @default(OPEN)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([leadId])
+  @@index([status])
+}
+
+enum MessageType {
+  EMAIL
+  SMS
+}
+
+enum MessageDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum MessageStatus {
+  DRAFT // AI/template draft, not yet reviewed
+  PENDING_APPROVAL // waiting for human approval
+  APPROVED // approved, ready/scheduled to send
+  REJECTED // human rejected
+  QUEUED // handed to provider
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  FAILED
+  RECEIVED // inbound reply
+}
+
+model Message {
+  id          String           @id @default(cuid())
+  companyId   String
+  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leadId      String
+  lead        Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type        MessageType
+  direction   MessageDirection @default(OUTBOUND)
+  status      MessageStatus    @default(DRAFT)
+  subject     String? // email only
+  content     String
+  // Where the draft came from, for observability
+  generatedBy String? // "ai", "template", "human"
+  approvedById String?
+  rejectionReason String?
+  scheduledFor DateTime?
+  sentAt      DateTime?
+  failureReason String?
+  retryCount  Int              @default(0)
+  providerId  String? // id returned by SMTP/SMS provider
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([companyId, status])
+  @@index([leadId])
+  @@index([status])
+}
+
+model Pipeline {
+  id        String     @id @default(cuid())
+  leadId    String     @unique
+  lead      Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  stage     LeadStatus @default(NEW)
+  value     Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Templates, automation, compliance, ops
+// ---------------------------------------------------------------------------
+
+model Template {
+  id        String      @id @default(cuid())
+  companyId String?
+  company   Company?    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  type      MessageType
+  subject   String?
+  body      String // supports {{tokens}}
+  // workflow this template belongs to: re_engage | missed_call | estimate_followup
+  workflow  String?
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([companyId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action    String // e.g. "message.approved"
+  entity    String // e.g. "Message"
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+model Consent {
+  id        String   @id @default(cuid())
+  leadId    String
+  channel   MessageType
+  granted   Boolean
+  source    String? // how consent was captured/changed
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+}
+
+model FeatureFlag {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  enabled   Boolean  @default(false)
+  description String?
+  updatedAt DateTime @updatedAt
+}
+
+model Onboarding {
+  id          String  @id @default(cuid())
+  companyId   String  @unique
+  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // 1..7 step progress
+  step        Int     @default(1)
+  completed   Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Inbound public lead-capture form submissions (marketing site)
+model InboundLead {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  message   String?
+  source    String   @default("website")
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
