@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import path from 'path';
 
 dotenv.config();
 
@@ -49,4 +50,12 @@ export const env = {
   },
   // Frequency / safety limits
   maxMessagesPerLeadPerWeek: parseInt(process.env.MAX_MESSAGES_PER_LEAD_PER_WEEK ?? '3', 10),
+  // Single-service deploy: when true, the API also serves the built web app so
+  // the whole product runs from one host (and /api is same-origin).
+  serveWeb: process.env.SERVE_WEB === 'true',
+  webDistPath: process.env.WEB_DIST_PATH ?? path.resolve(__dirname, '../../../web/dist'),
+  // First-run admin bootstrap (creates an ADMIN account if none exists).
+  adminEmail: process.env.ADMIN_EMAIL ?? '',
+  adminPassword: process.env.ADMIN_PASSWORD ?? '',
+  adminName: process.env.ADMIN_NAME ?? 'LeakHunter Admin',
 };

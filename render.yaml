@@ -1,0 +1,45 @@
+# Render blueprint: provisions a Postgres database + a single web service that
+# runs the API and serves the built React app. Deploy via Render > New >
+# Blueprint, pointed at this repo. Set the `sync: false` env vars in the
+# dashboard (they're secrets / per-deploy values).
+databases:
+  - name: leakhunter-db
+    databaseName: leakhunter
+    plan: free
+
+services:
+  - type: web
+    name: leakhunter
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm --workspace server run db:generate && npm run build
+    startCommand: npm --workspace server run db:migrate && node server/dist/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVE_WEB
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: leakhunter-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      # First-run admin login (set these in the Render dashboard).
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Public URL of this service (for email unsubscribe links) + CAN-SPAM address.
+      - key: PUBLIC_URL
+        sync: false
+      - key: BUSINESS_ADDRESS
+        sync: false
+      # Providers start in safe mode; switch to smtp/twilio when ready.
+      - key: EMAIL_PROVIDER
+        value: console
+      - key: SMS_PROVIDER
+        value: console
+      - key: AI_PROVIDER
+        value: mock

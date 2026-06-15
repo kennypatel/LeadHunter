@@ -2,11 +2,14 @@ import { createApp } from './app';
 import { env } from './config/env';
 import { logger } from './lib/logger';
 import { processDueMessages } from './services/messaging';
+import { ensureAdmin, ensureSendFlags } from './services/bootstrap';
 
 const app = createApp();
 
-const server = app.listen(env.port, () => {
+const server = app.listen(env.port, async () => {
   logger.info('LeakHunter API listening', { port: env.port, env: env.nodeEnv });
+  await ensureSendFlags();
+  await ensureAdmin();
 });
 
 // Lightweight in-process scheduler for scheduled/retry sends.
