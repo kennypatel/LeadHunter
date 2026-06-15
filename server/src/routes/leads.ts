@@ -108,8 +108,9 @@ router.post(
         estimatedValue: data.estimatedValue ?? 0,
         notesText: data.notesText,
         tags: data.tags ?? [],
-        consentEmail: data.consentEmail ?? false,
-        consentSms: data.consentSms ?? false,
+        // Default consent ON (operator affirms they have permission to contact).
+        consentEmail: data.consentEmail ?? true,
+        consentSms: data.consentSms ?? true,
         score: score.score,
         scoreReason: score.reason,
         pipeline: { create: { stage: 'NEW', value: data.estimatedValue ?? 0 } },
@@ -235,6 +236,9 @@ router.post(
           source: p.source ?? 'csv_import',
           estimatedValue: p.estimatedValue ?? 0,
           notesText: p.notesText,
+          // Imported leads default to consented (operator affirms permission).
+          consentEmail: true,
+          consentSms: true,
           score: score.score,
           scoreReason: score.reason,
           pipeline: { create: { stage: 'NEW', value: p.estimatedValue ?? 0 } },
