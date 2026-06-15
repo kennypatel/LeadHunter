@@ -13,8 +13,8 @@ export default function AddLeadForm({ onCreated, onClose }: { onCreated: () => v
     phone: '',
     estimatedValue: '',
     source: 'manual',
-    consentEmail: false,
-    consentSms: false,
+    consentEmail: true,
+    consentSms: true,
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -81,7 +81,8 @@ export default function AddLeadForm({ onCreated, onClose }: { onCreated: () => v
           </label>
         </div>
         <p className="mt-2 text-xs text-slate-400">
-          Only check a box if you genuinely have permission — it's a legal requirement (TCPA / CAN-SPAM).
+          Consent is on by default. <b>Uncheck</b> a box if you don't have permission to contact this lead on
+          that channel — it's a legal requirement (TCPA for texts, CAN-SPAM for email).
         </p>
       </div>
 
