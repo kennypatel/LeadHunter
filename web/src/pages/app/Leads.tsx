@@ -54,6 +54,28 @@ export default function Leads() {
     }
   }
 
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  async function sendEmail(l: Lead) {
+    if (!l.email) {
+      setError(`${l.name} has no email address.`);
+      return;
+    }
+    if (!confirm(`Send an email to ${l.name} (${l.email}) now?`)) return;
+    setError('');
+    setNotice('');
+    setSendingId(l.id);
+    try {
+      // Sends the lead's latest email draft, or drafts one first, then sends it.
+      await api.post(`/leads/${l.id}/send-email`);
+      setNotice(`Email sent to ${l.name}.`);
+      load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSendingId(null);
+    }
+  }
+
   const [drafting, setDrafting] = useState(false);
   async function draftEmailToAll() {
     setNotice('');
@@ -135,6 +157,7 @@ export default function Leads() {
                 <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2">Value</th>
                 <th className="px-4 py-2">Source</th>
+                {user?.role === 'ADMIN' && <th className="px-4 py-2 text-right">Action</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -148,6 +171,18 @@ export default function Leads() {
                   <td className="px-4 py-2"><StatusBadge status={l.status} /></td>
                   <td className="px-4 py-2">{money(l.estimatedValue)}</td>
                   <td className="px-4 py-2 text-slate-500">{l.source || '—'}</td>
+                  {user?.role === 'ADMIN' && (
+                    <td className="px-4 py-2 text-right">
+                      <button
+                        className="btn-primary text-xs"
+                        disabled={sendingId === l.id || !l.email}
+                        title={l.email ? 'Draft (if needed) and send an email now' : 'No email address'}
+                        onClick={() => sendEmail(l)}
+                      >
+                        {sendingId === l.id ? 'Sending…' : 'Send'}
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

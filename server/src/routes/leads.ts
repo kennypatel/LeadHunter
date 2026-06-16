@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
+import { Prisma, MessageStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { authenticate, scopedCompanyId } from '../middleware/auth';
 import { asyncHandler, HttpError } from '../middleware/error';
 import { parseLeadsCsv, dedupeKey, normalizePhone, normalizeEmail } from '../utils/csv';
 import { scoreLead } from '../utils/scoring';
 import { classifyAndSave, generateDraft } from '../services/recovery';
+import { approveMessage, sendMessage, SendBlockedError } from '../services/messaging';
 import { getAiProvider } from '../services/ai';
 import { audit } from '../services/audit';
 
@@ -291,6 +292,39 @@ router.post(
       actorId: req.user!.id,
     });
     res.status(201).json({ message });
+  })
+);
+
+// One-click "send email" for a lead: reuse the latest sendable email draft, or
+// generate one, then approve + send it. The compliance gate still applies.
+const SENDABLE_STATES: MessageStatus[] = ['PENDING_APPROVAL', 'APPROVED', 'QUEUED', 'FAILED'];
+router.post(
+  '/:id/send-email',
+  asyncHandler(async (req, res) => {
+    await assertLeadScope(req, req.params.id);
+    let message = await prisma.message.findFirst({
+      where: {
+        leadId: req.params.id,
+        type: 'EMAIL',
+        direction: 'OUTBOUND',
+        status: { in: SENDABLE_STATES },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!message) {
+      const style = req.user!.role === 'ADMIN' ? 'sales' : 'recovery';
+      message = await generateDraft({ leadId: req.params.id, type: 'EMAIL', style, actorId: req.user!.id });
+    }
+    try {
+      if (message.status === 'PENDING_APPROVAL') {
+        await approveMessage(message.id, req.user!.id);
+      }
+      const sent = await sendMessage(message.id, req.user!.id);
+      res.json({ message: sent });
+    } catch (err) {
+      if (err instanceof SendBlockedError) throw new HttpError(422, err.message);
+      throw err;
+    }
   })
 );
 
