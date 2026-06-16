@@ -19,7 +19,7 @@ describe('sales draft rendering leaves no empty tokens', () => {
     const body = renderTemplate(tmpl.body, tokens);
     expect(subject).not.toMatch(/\{\{|\}\}/);
     expect(body).not.toMatch(/\{\{|\}\}/);
-    expect(body).toContain('Dana');
+    expect(body).toContain('Kenny Patel');
   });
 
   it('every token used across all templates is a known SALES token', () => {
