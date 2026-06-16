@@ -30,8 +30,8 @@ export const SALES_TEMPLATES: SalesTemplate[] = [
     category: 'Cold email sequence',
     name: 'Email 1 — Opener',
     channel: 'EMAIL',
-    subject: 'the leads {{companyName}} already paid for',
-    body: `Hi {{firstName}},
+    subject: 'Quick question about your old leads',
+    body: `Hi,
 
 Most roofing companies are sitting on a goldmine they've forgotten about: missed calls, old quotes, and estimates that quietly went cold. Those homeowners were ready to buy once — most just need a nudge.
 
@@ -48,8 +48,8 @@ I'd like to run a free audit of your missed calls and old leads and show you, in
     category: 'Cold email sequence',
     name: 'Email 2 — Follow-up (3 days later)',
     channel: 'EMAIL',
-    subject: 're: the leads {{companyName}} already paid for',
-    body: `Hi {{firstName}},
+    subject: 're: Quick question about your old leads',
+    body: `Hi,
 
 Floating this back to the top. Even recovering 2–3 extra roofs a month — from leads you already have — is a serious number, with zero added marketing cost.
 
@@ -63,7 +63,7 @@ Want me to run the free audit? Just reply "audit" and I'll handle the rest.
     name: 'Email 3 — How it works (5 days later)',
     channel: 'EMAIL',
     subject: 'how roofers turn old quotes into booked jobs',
-    body: `Hi {{firstName}},
+    body: `Hi,
 
 Here's the playbook in plain English: we load your old leads, the system writes a personal follow-up for each, and you approve them in batches — nothing sends without your okay. Replies come in, estimates get booked, and you stop leaving money on the table.
 
@@ -79,8 +79,8 @@ Got 15 minutes this week? {{calendarLink}}
     category: 'Cold email sequence',
     name: 'Email 4 — Breakup (7 days later)',
     channel: 'EMAIL',
-    subject: 'closing your file, {{firstName}}?',
-    body: `Hi {{firstName}},
+    subject: 'Closing your file?',
+    body: `Hi,
 
 I don't want to keep cluttering your inbox. If reviving old leads isn't a priority for {{companyName}} right now, no hard feelings — I'll close this out.
 
